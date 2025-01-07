@@ -1,4 +1,10 @@
 // backend/model/GameMove.java
+package com.example.hnb_chess.model;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "game_moves")
 @Data
@@ -14,12 +20,10 @@ public class GameMove {
     @ManyToOne
     @JoinColumn(name = "player_id")
     private Player player;
-
-    private String move;  // e.g., "e2e4"
-    private String piece; // For brain suggestions
     
-    @Enumerated(EnumType.STRING)
-    private PlayerRole playerRole;  // BRAIN or HAND
+    private Integer moveNumber = 0;
+    private String move;
+    private String fen;
 
     private LocalDateTime createdAt;
 

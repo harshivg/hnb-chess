@@ -72,5 +72,4 @@ export class WebSocketService {
     }
 }
 
-// Create and export singleton instance
 export const webSocketService = new WebSocketService();

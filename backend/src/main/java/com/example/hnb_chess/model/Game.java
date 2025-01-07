@@ -16,6 +16,8 @@ public class Game {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    //can add one to many relations here
+
     @ManyToOne
     @JoinColumn(name = "white_hand_id")
     private Player whiteHand;

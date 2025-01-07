@@ -4,7 +4,7 @@ import { Player } from '../types/game';
 interface PlayerSelectorProps {
     currentPlayerId: string | null;
     onPlayerSelect: (playerId: string) => void;
-    players: Player[];  // Changed to Player array
+    players: Player[];  
 }
 
 const PlayerSelector = ({ currentPlayerId, onPlayerSelect, players }: PlayerSelectorProps) => {

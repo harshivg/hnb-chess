@@ -43,6 +43,12 @@ export const api = {
             );
             if (!response.ok) throw new Error('Failed to join game');
             return response.json();
+        },
+
+        getGame: async (gameId: string): Promise<Game> => {
+            const response = await fetch(`${API_BASE}/games/${gameId}`);
+            if (!response.ok) throw new Error('Failed to fetch game');
+            return response.json();
         }
     }
 };

@@ -6,8 +6,14 @@ import com.example.hnb_chess.model.Player;
 import com.example.hnb_chess.model.enums.GameStatus;
 import com.example.hnb_chess.model.enums.PlayerRole;
 import com.example.hnb_chess.model.enums.TeamColor;
+import com.example.hnb_chess.model.GameSuggestion;
+import com.example.hnb_chess.model.GameMove;
+import com.example.hnb_chess.model.enums.PieceSuggestions;
 import com.example.hnb_chess.exception.GameException;
+import com.example.hnb_chess.exception.PlayerException;
 import com.example.hnb_chess.repository.GameRepository;
+import com.example.hnb_chess.repository.GameSuggestionRepository;
+import com.example.hnb_chess.repository.GameMoveRepository;
 
 import com.github.bhlangonijr.chesslib.Board;
 import com.github.bhlangonijr.chesslib.move.Move;
@@ -25,15 +31,29 @@ import com.github.bhlangonijr.chesslib.Piece;
 public class GameService {
   private final GameRepository gameRepository;
   private final PlayerService playerService;
+  private final GameSuggestionRepository gameSuggestionRepository;
+  private final GameMoveRepository gameMoveRepository;
 
   @Autowired
-  public GameService(GameRepository gameRepository, PlayerService playerService) {
+  public GameService(
+    GameRepository gameRepository, 
+    PlayerService playerService, 
+    GameSuggestionRepository gameSuggestionRepository,
+    GameMoveRepository gameMoveRepository
+    ) {
     this.gameRepository = gameRepository;
     this.playerService = playerService;
+    this.gameSuggestionRepository = gameSuggestionRepository;
+    this.gameMoveRepository = gameMoveRepository;
   }
 
-  public Game createGame(String playerId, TeamColor teamColor, PlayerRole role) {
+  public Game createGame(
+    String playerId, 
+    TeamColor teamColor, 
+    PlayerRole role
+  ) {
     Player player = playerService.getPlayer(playerId);
+
     Game game = new Game();
       
     // Assign player to their chosen position
@@ -42,11 +62,19 @@ public class GameService {
     return gameRepository.save(game);
   }
 
-  public Game joinGame(String gameId, String playerId, TeamColor teamColor, PlayerRole role) {
-    Game game = gameRepository.findById(gameId)
-        .orElseThrow(() -> new RuntimeException("Game not found"));
+  public Game joinGame(
+    String gameId, 
+    String playerId, 
+    TeamColor teamColor, 
+    PlayerRole role
+  ) {
+    Game game = gameRepository.findById(gameId).orElseThrow(() -> new GameException("Game not found"));
           
     Player player = playerService.getPlayer(playerId);
+
+    // if(game.getWhiteHand() == playerId) {
+    //   return game
+    // }
 
     if (isPositionTaken(game, teamColor, role)){
       throw new RuntimeException("Position already taken");
@@ -55,7 +83,8 @@ public class GameService {
     assignPlayerToPosition(game, player, teamColor, role);
       
     if (areAllPlayersJoined(game)) {
-        game.setStatus(GameStatus.IN_PROGRESS);
+      game.setStatus(GameStatus.IN_PROGRESS);
+      // can also abstract this to a method start game.
     }
 
     return gameRepository.save(game);
@@ -66,28 +95,28 @@ public class GameService {
   }
 
   public Game getGame(String gameId) {
-    return gameRepository.findById(gameId)
-        .orElseThrow(() -> new GameException("Game not found"));
+    return gameRepository.findById(gameId).orElseThrow(() -> new GameException("Game not found"));
   }
 
   public List<Game> getGamesByStatus(GameStatus status) {
     return gameRepository.findByStatus(status);
   }
 
-  // public List<Game> getGamesByPlayer(String playerId) {
-  //   return gameRepository.findByWhiteHandIdOrWhiteBrainIdOrBlackHandIdOrBlackBrainId(
-  //       playerId, playerId, playerId, playerId);
-  // }
-
   public void deleteGame(String gameId) {
     gameRepository.deleteById(gameId);
   }
 
-  private void assignPlayerToPosition(Game game, Player player, TeamColor teamColor, PlayerRole role) {
+  private void assignPlayerToPosition(
+    Game game, 
+    Player player, 
+    TeamColor teamColor, 
+    PlayerRole role
+  ) {
     if (teamColor == TeamColor.WHITE) {
-      if (role == PlayerRole.HAND) {
+      if(role == PlayerRole.HAND){
         game.setWhiteHand(player);
-      } else {
+      }
+      else{
         game.setWhiteBrain(player);
       }
     } else {
@@ -99,7 +128,11 @@ public class GameService {
     }
   }
 
-  private boolean isPositionTaken(Game game, TeamColor teamColor, PlayerRole role) {
+  private boolean isPositionTaken(
+    Game game, 
+    TeamColor teamColor, 
+    PlayerRole role
+  ) {
     if (teamColor == TeamColor.WHITE) {
       return (role == PlayerRole.HAND && game.getWhiteHand() != null) ||
       (role == PlayerRole.BRAIN && game.getWhiteBrain() != null);
@@ -116,86 +149,119 @@ public class GameService {
       game.getBlackBrain() != null;
   }
 
-  // Add these methods to GameService
-  // Update handleBrainSelection to use this
-  public Game handleBrainSelection(String gameId, String playerId, String selectedPiece) {
-      Game game = gameRepository.findById(gameId)
-          .orElseThrow(() -> new GameException("Game not found"));
+  public Game handleBrainSelection(
+    String gameId, 
+    String playerId, 
+    String selectedPiece
+    ) {
+    Game game = gameRepository.findById(gameId).orElseThrow(() -> new GameException("Game not found"));
 
-      validateBrainTurn(game, playerId);
+    validateBrainTurn(game, playerId);
 
-      // Check if selected piece has legal moves
-      List<String> legalMoves = getLegalMovesForPiece(game.getFen(), selectedPiece);
-      if (legalMoves.isEmpty()) {
-          throw new GameException("No legal moves for selected piece");
-      }
+    
+    // Check if selected piece has legal moves
+    List<String> legalMoves = getLegalMovesForPiece(game.getFen(), selectedPiece);
+    if (legalMoves.isEmpty()) {
+      throw new GameException("No legal moves for selected piece");
+    }
 
-      game.setSelectedPiece(selectedPiece);
-      game.setCurrentRole(PlayerRole.HAND);
+    addGameSuggestion(game, playerId, selectedPiece);
+    
+    game.setSelectedPiece(selectedPiece);
+    game.setCurrentRole(PlayerRole.HAND);
 
-      return gameRepository.save(game);
+    return gameRepository.save(game);
+  }
+
+  public GameSuggestion addGameSuggestion(
+    Game game, 
+    String playerId, 
+    String pieceType
+  ) {
+    Player player = playerService.getPlayer(playerId);
+
+    GameSuggestion gameSuggestion = new GameSuggestion();
+    gameSuggestion.setGame(game);
+    gameSuggestion.setPlayer(player);
+    gameSuggestion.setPieceType(PieceSuggestions.valueOf(pieceType.toUpperCase()));
+    gameSuggestion.setSuggestionNumber(gameSuggestion.getSuggestionNumber() + 1);
+
+    return gameSuggestionRepository.save(gameSuggestion);
   }
 
   public Game handleHandMove(String gameId, String playerId, String move) {
-      Game game = gameRepository.findById(gameId)
-          .orElseThrow(() -> new GameException("Game not found"));
+    Game game = gameRepository.findById(gameId).orElseThrow(() -> new GameException("Game not found"));
 
-      // Validate it's hand's turn
-      validateHandTurn(game, playerId);
+    validateHandTurn(game, playerId);
 
-      // Validate the move is for the selected piece
-      validateMoveMatchesSelectedPiece(game, move);
+    validateMoveMatchesSelectedPiece(game, move);
 
-      try {
-          Board board = new Board();
-          board.loadFromFen(game.getFen());
-          
-          Move chessMove = new Move(move, board.getSideToMove());
-          
-          // Validate move is legal
-          if (!board.legalMoves().contains(chessMove)) {
-              throw new GameException("Illegal move");
-          }
-
-          // Make the move
-          board.doMove(chessMove);
-          game.setFen(board.getFen());
-          game.setSelectedPiece(null);
-          game.setCurrentTeam(game.getCurrentTeam() == TeamColor.WHITE ? 
-              TeamColor.BLACK : TeamColor.WHITE);
-          game.setCurrentRole(PlayerRole.BRAIN);
-
-          checkGameEnd(game);
-
-          return gameRepository.save(game);
-      } catch (Exception e) {
-          throw new GameException("Invalid move format");
+    try {
+      Board board = new Board();
+      board.loadFromFen(game.getFen());
+        
+      Move chessMove = new Move(move, board.getSideToMove());
+        
+      if (!board.legalMoves().contains(chessMove)) {
+        throw new GameException("Illegal move");
       }
+
+      addGameMove(game, playerId, move);
+
+      board.doMove(chessMove);
+      game.setFen(board.getFen());
+      game.setSelectedPiece(null);
+      game.setCurrentTeam(game.getCurrentTeam() == TeamColor.WHITE ? TeamColor.BLACK : TeamColor.WHITE);
+      game.setCurrentRole(PlayerRole.BRAIN);
+
+      checkGameEnd(game);
+
+      return gameRepository.save(game);
+    } catch (Exception e) {
+      throw new GameException("Invalid move format");
+    }
+  }
+
+  public GameMove addGameMove(
+    Game game, 
+    String playerId, 
+    String move
+  ) {
+    Player player = playerService.getPlayer(playerId);
+
+    GameMove gameMove = new GameMove();
+    gameMove.setGame(game);
+    gameMove.setPlayer(player);
+    gameMove.setMoveNumber(gameMove.getMoveNumber() + 1);
+    gameMove.setMove(move);
+    gameMove.setFen(calculateNewFen(game.getFen(), move));
+
+    return gameMoveRepository.save(gameMove);
   }
 
   private void validateMoveMatchesSelectedPiece(Game game, String move) {
-      if (game.getSelectedPiece() == null) {
-          throw new GameException("Brain hasn't selected a piece yet");
-      }
+    if (game.getSelectedPiece() == null) {
+      throw new GameException("Brain hasn't selected a piece yet");
+    }
 
       Board board = new Board();
       board.loadFromFen(game.getFen());
       
-      // Get the piece at the 'from' square
-      String fromSquare = move.substring(0, 2); // e.g., "e2" from "e2e4"
-      Piece piece = board.getPiece(Square.valueOf(fromSquare.toUpperCase()));
-      
-      // Check if it's the type of piece that brain selected
-      if (!piece.getPieceType().name().equalsIgnoreCase(game.getSelectedPiece())) {
-          throw new GameException("Must move the piece type selected by brain: " + game.getSelectedPiece());
-      }
+    // Get the piece at the 'from' square
+    String fromSquare = move.substring(0, 2); // e.g., "e2" from "e2e4"
+    Piece piece = board.getPiece(Square.valueOf(fromSquare.toUpperCase()));
+    
+    // Check if it's the type of piece that brain selected
+    if (!piece.getPieceType().name().equalsIgnoreCase(game.getSelectedPiece())) {
+        throw new GameException("Must move the piece type selected by brain: " + game.getSelectedPiece());
+    }
 
-      // Verify piece color matches current team
-      boolean isWhitePiece = piece.toString().startsWith("W");  // White pieces start with 'W'
-      if ((game.getCurrentTeam() == TeamColor.WHITE && !isWhitePiece) ||
-          (game.getCurrentTeam() == TeamColor.BLACK && isWhitePiece)) {
-          throw new GameException("Must move your own piece");
-      }
+    // Verify piece color matches current team
+    boolean isWhitePiece = piece.toString().startsWith("W");  // White pieces start with 'W'
+    if ((game.getCurrentTeam() == TeamColor.WHITE && !isWhitePiece) ||(game.getCurrentTeam() == TeamColor.BLACK && isWhitePiece)) 
+    {
+      throw new GameException("Must move your own piece");
+    }
   }
 
   private void validateBrainTurn(Game game, String playerId) {
@@ -231,32 +297,32 @@ public class GameService {
     board.loadFromFen(game.getFen());
     
     if (board.isMated()) {
-        game.setStatus(GameStatus.FINISHED);
-        // Determine winner based on current team
-        TeamColor winner = game.getCurrentTeam() == TeamColor.WHITE ? TeamColor.BLACK : TeamColor.WHITE;
-        // Could add a winner field to Game class
-    } else if (board.isDraw() || board.isStaleMate()) {
-        game.setStatus(GameStatus.FINISHED);
+      game.setStatus(GameStatus.FINISHED);
+
+      TeamColor winner = game.getCurrentTeam() == TeamColor.WHITE ? TeamColor.BLACK : TeamColor.WHITE;
+      // Could add a winner field to Game class
+    } else if (board.isDraw() || board.isStaleMate()) { 
+      // add more draw conditions + abandoned
+      game.setStatus(GameStatus.FINISHED);
     }
   }
 
   private String calculateNewFen(String currentFen, String move) {
     try {
-        Board board = new Board();
-        board.loadFromFen(currentFen);
-        
-        // Convert string move to Move object
-        Move chessMove = new Move(move, board.getSideToMove());
-        
-        // Validate and make move
-        if (board.legalMoves().contains(chessMove)) {
-            board.doMove(chessMove);
-            return board.getFen();
-        } else {
-            throw new GameException("Illegal move");
-        }
+      Board board = new Board();
+      board.loadFromFen(currentFen);
+      
+      Move chessMove = new Move(move, board.getSideToMove());
+      
+      // Validate and make move
+      if (board.legalMoves().contains(chessMove)) {
+        board.doMove(chessMove);
+        return board.getFen();
+      } else {
+          throw new GameException("Illegal move");
+      }
     } catch (Exception e) {
-        throw new GameException("Invalid move format");
+      throw new GameException("Invalid move format");
     }
   }
 
@@ -264,13 +330,26 @@ public class GameService {
     Board board = new Board();
     board.loadFromFen(fen);
       
-    return board.legalMoves().stream()
-        .filter(move -> {
-            Piece piece = board.getPiece(move.getFrom());
-            return piece.getPieceType().name().equalsIgnoreCase(pieceType);
-        })
-        .map(Move::toString)
-        .collect(Collectors.toList());
+    return board.legalMoves().stream().filter(
+      move -> 
+        {
+          Piece piece = board.getPiece(move.getFrom());
+          return piece.getPieceType().name().equalsIgnoreCase(pieceType);
+        }
+      )
+      .map(Move::toString)
+      .collect(Collectors.toList());
   }
 
+  public List<GameSuggestion> getGameSuggestions(String gameId) {
+    // Game game = GameSuggestionRepository.findById(gameId).orElseThrow(() -> new GameException("Game not found")); fix
+
+    return gameSuggestionRepository.findByGameIdOrderBySuggestionNumberAsc(gameId);
+  }
+
+  public List<GameMove> getGameMoves(String gameId) {
+    // Game game = gameRepository.findById(gameId).orElseThrow(() -> new GameException("Game not found")); fix
+
+    return gameMoveRepository.findByGameIdOrderByMoveNumberAsc(gameId);
+  }
 }

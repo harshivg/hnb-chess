@@ -10,6 +10,8 @@ import GameStatus from './components/GameStatus';
 import { Game, TeamColor, PlayerRole, Player } from './types/game';
 import { WebSocketService } from './services/webSocketService';
 import { api } from './services/api';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import {GamePage} from './pages/GamePage';
 
 // Initialize WebSocket service
 const webSocketService = new WebSocketService();
@@ -168,12 +170,6 @@ function App() {
     const handleHandMove = (move: { from: string; to: string }) => {
         if (!game || !currentPlayerId) return;
 
-        console.log('Attempting move:', {
-            gameId: game.id,
-            playerId: currentPlayerId,
-            move: `${move.from}${move.to}`
-        });
-
         webSocketService.sendHandMove({
             gameId: game.id,
             playerId: currentPlayerId,
@@ -182,6 +178,7 @@ function App() {
     };
 
     return (
+        <BrowserRouter>
         <Layout>
             {/* Error Display */}
             {error && (
@@ -205,20 +202,10 @@ function App() {
                 reconnect={connectToGame}
             />
 
-            {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-16">
-                {/* Game Board */}
-                <div className="lg:col-span-2">
-                    <GameBoard
-                        game={game}
-                        currentPlayerId={currentPlayerId}
-                        onBrainSelect={handleBrainSelect}
-                        onHandMove={handleHandMove}
-                    />
-                </div>
-                
-                {/* Sidebar */}
-                <div className="space-y-4">
+            <Routes>
+                <Route 
+                    path="/"
+                    element={
                     <SetupPanel 
                         onCreatePlayer={handleCreatePlayer}
                         onCreateGame={handleCreateGame}
@@ -229,21 +216,28 @@ function App() {
                         currentPlayerId={currentPlayerId}
                         currentGame={game}
                     />
-                    {game && (
-                        <GameInfo 
-                            game={game}
-                            currentPlayerId={currentPlayerId}
-                        />
-                    )}
-                    <GameStatus 
-                        game={game}
-                        currentPlayerId={currentPlayerId}
-                        players={players}
-                        isConnected={isConnected}
-                    />
-                </div>
-            </div>
+                    }
+                />
+                <Route path = "/game/:gameId"
+                    element={
+                        <GamePage
+                                game={game}
+                                currentPlayerId={currentPlayerId}
+                                players={players}
+                                isConnected={isConnected}
+                                onBrainSelect={handleBrainSelect}
+                                onHandMove={handleHandMove}
+                                setGame={setGame}
+                                setError={setError}
+                            />
+                    }
+                />
+            </Routes>
+
+            {/* Main Content */}
+            
         </Layout>
+        </BrowserRouter>
     );
 }
 

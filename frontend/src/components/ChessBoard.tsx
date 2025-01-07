@@ -27,7 +27,10 @@ const ChessBoard = ({ game, currentPlayerId, onBrainSelect, onHandMove }: ChessB
     };
 
     const makeMove = (sourceSquare: string, targetSquare: string) => {
-        if (!canMove()) return false;
+        if (!canMove()){
+            console.error('Invalid move: Not your turn');
+            return false;
+        }
 
         try {
             const move = chessInstance.move({
@@ -35,6 +38,10 @@ const ChessBoard = ({ game, currentPlayerId, onBrainSelect, onHandMove }: ChessB
                 to: targetSquare,
                 promotion: 'q'
             });
+
+            console.log('Move:', 
+                move.from, move.to
+            );
 
             if (move) {
                 onHandMove?.({ from: sourceSquare, to: targetSquare });
@@ -50,7 +57,7 @@ const ChessBoard = ({ game, currentPlayerId, onBrainSelect, onHandMove }: ChessB
 
     return (
         <div className="flex flex-col items-center space-y-4">
-            <div className="w-[560px] aspect-square">
+            <div className="w-full aspect-square">
                 <Chessboard 
                     position={game.fen}
                     onPieceDrop={makeMove}

@@ -6,6 +6,8 @@ import com.example.hnb_chess.model.enums.GameStatus;
 import com.example.hnb_chess.model.enums.PlayerRole;
 import com.example.hnb_chess.model.enums.TeamColor;
 import com.example.hnb_chess.service.GameService;
+import com.example.hnb_chess.model.GameMove;
+import com.example.hnb_chess.model.GameSuggestion;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,18 +27,20 @@ public class GameController {
 
     @PostMapping
     public ResponseEntity<Game> createGame(
-            @RequestParam String playerId,
-            @RequestParam TeamColor teamColor,
-            @RequestParam PlayerRole role) {
+        @RequestParam String playerId,
+        @RequestParam TeamColor teamColor,
+        @RequestParam PlayerRole role
+    ) {
         return ResponseEntity.ok(gameService.createGame(playerId, teamColor, role));
     }
 
     @PostMapping("/{gameId}/join")
     public ResponseEntity<Game> joinGame(
-            @PathVariable String gameId,
-            @RequestParam String playerId,
-            @RequestParam TeamColor teamColor,
-            @RequestParam PlayerRole role) {
+        @PathVariable String gameId,
+        @RequestParam String playerId,
+        @RequestParam TeamColor teamColor,
+        @RequestParam PlayerRole role
+    ) {
         return ResponseEntity.ok(gameService.joinGame(gameId, playerId, teamColor, role));
     }
 
@@ -55,11 +59,6 @@ public class GameController {
         return ResponseEntity.ok(gameService.getGamesByStatus(GameStatus.WAITING_FOR_PLAYERS));
     }
 
-    // @GetMapping("/player/{playerId}")
-    // public ResponseEntity<List<Game>> getPlayerGames(@PathVariable String playerId) {
-    //     return ResponseEntity.ok(gameService.getGamesByPlayer(playerId));
-    // }
-
     @DeleteMapping("/{gameId}")
     public ResponseEntity<Void> deleteGame(@PathVariable String gameId) {
         gameService.deleteGame(gameId);
@@ -69,5 +68,15 @@ public class GameController {
     @GetMapping("/{gameId}/status")
     public ResponseEntity<GameStatus> getGameStatus(@PathVariable String gameId) {
         return ResponseEntity.ok(gameService.getGame(gameId).getStatus());
+    }
+
+    @GetMapping("/{gameId}/suggestions")
+    public ResponseEntity<List<GameSuggestion>> getGameSuggestions(@PathVariable String gameId) {
+        return ResponseEntity.ok(gameService.getGameSuggestions(gameId));
+    }
+
+    @GetMapping("/{gameId}/moves")
+    public ResponseEntity<List<GameMove>> getGameMoves(@PathVariable String gameId) {
+        return ResponseEntity.ok(gameService.getGameMoves(gameId));
     }
 }
